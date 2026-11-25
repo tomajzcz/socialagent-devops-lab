@@ -11,6 +11,8 @@
 *.tfvars
 !*.tfvars.example
 crash.log
+tfplan
+*.tfplan
 
 # Kubernetes a SSH klíče
 kubeconfig*
