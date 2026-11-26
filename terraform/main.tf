@@ -7,7 +7,7 @@ resource "hcloud_firewall" "lab" {
   name = "${var.server_name}-fw"
 
   rule {
-    description = "SSH jen z mé IP"
+    description = "SSH from admin IP only"
     direction   = "in"
     protocol    = "tcp"
     port        = "22"
@@ -15,7 +15,7 @@ resource "hcloud_firewall" "lab" {
   }
 
   rule {
-    description = "Ping jen z mé IP"
+    description = "ICMP (ping) from admin IP only"
     direction   = "in"
     protocol    = "icmp"
     source_ips  = [var.ssh_allowed_cidr]
@@ -31,7 +31,7 @@ resource "hcloud_server" "lab" {
   firewall_ids = [hcloud_firewall.lab.id]
 
   public_net {
-    ipv4_enabled = true # primární IPv4 se platí zvlášť
+    ipv4_enabled = true # primary IPv4 is billed separately
     ipv6_enabled = true
   }
 
