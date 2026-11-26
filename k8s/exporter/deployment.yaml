@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socialagent-exporter
+  namespace: socialagent
+  labels:
+    app.kubernetes.io/name: socialagent-exporter
+spec:
+  # One replica on purpose: every replica calls the production endpoint.
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: socialagent-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: socialagent-exporter
+    spec:
+      # The exporter never talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: exporter
+          # Tag for humans, digest for Kubernetes: these exact bytes, even if the tag moves.
+          image: ghcr.io/tomajzcz/socialagent-exporter:0.1.0@sha256:62194f1e1b43eb49b890348ce2f83d1aa09d7395c2dc754e36b28390c2759ac1
+          env:
+            - name: TARGET_URL
+              value: https://socialagent.cz/api/health
+            - name: PROBE_INTERVAL_SECONDS
+              value: "60"
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
