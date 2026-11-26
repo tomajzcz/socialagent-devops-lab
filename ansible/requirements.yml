@@ -1,0 +1,10 @@
+# Ansible collections this project depends on (the Ansible counterpart of
+# required_providers in Terraform).
+# Install on a new machine or in CI:
+#   ansible-galaxy collection install -r requirements.yml
+# ansible-lint reads this file as well and caches the collections in .ansible/
+# (git-ignored).
+collections:
+  # ansible.posix.authorized_key in roles/hardening
+  - name: ansible.posix
+    version: ">=2.0.0,<3.0.0"

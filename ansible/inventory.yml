@@ -1,0 +1,5 @@
+all:
+  hosts:
+    lab:
+      ansible_host: "{{ lookup('ansible.builtin.env', 'LAB_SERVER_IP', default=Undefined) | mandatory('LAB_SERVER_IP is not set, run: source ../.env') }}"
+      ansible_user: tomajz

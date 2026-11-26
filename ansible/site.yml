@@ -1,0 +1,5 @@
+- name: Harden the lab server
+  hosts: lab
+  become: true
+  roles:
+    - hardening

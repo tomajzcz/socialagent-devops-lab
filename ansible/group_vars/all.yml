@@ -1,0 +1,2 @@
+admin_user: "tomajz"
+admin_ssh_public_key: "{{ lookup('ansible.builtin.file', '~/.ssh/id_rsa.pub') }}"

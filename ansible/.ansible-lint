@@ -1,0 +1,5 @@
+# ansible-lint settings.
+# This file also marks ansible/ as the lint project root. Without it, ansible-lint
+# uses the git root, does not find requirements.yml here and cannot resolve
+# ansible.posix modules.
+profile: production

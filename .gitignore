@@ -1,10 +1,10 @@
-# Secrets a lokální konfigurace
+# Secrets and local config
 .env
 .env.*
 !.env.example
 
 # Terraform
-# (.terraform.lock.hcl se commitovat MÁ - zamyká verze providerů)
+# (.terraform.lock.hcl SHOULD be committed - it pins provider versions)
 .terraform/
 *.tfstate
 *.tfstate.*
@@ -14,7 +14,7 @@ crash.log
 tfplan
 *.tfplan
 
-# Kubernetes a SSH klíče
+# Kubernetes and SSH keys
 kubeconfig*
 *.kubeconfig
 *.pem
@@ -22,9 +22,11 @@ kubeconfig*
 id_rsa*
 id_ed25519*
 
-# Ansible (zašifrované vault soubory commitovat lze, heslo k nim ne)
+# Ansible (encrypted vault files may be committed, their password may not)
 *.retry
 .vault_pass*
+# Collections cache created by ansible-lint
+.ansible/
 
 # Python
 __pycache__/
