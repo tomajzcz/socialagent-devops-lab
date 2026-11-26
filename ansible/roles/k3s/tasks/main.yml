@@ -1,0 +1,58 @@
+- name: K3s config directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: K3s is configured
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart k3s
+
+- name: K3s install script is downloaded and verified
+  ansible.builtin.get_url:
+    url: "{{ k3s_install_script_url }}"
+    dest: /usr/local/bin/k3s-install.sh
+    checksum: "sha256:{{ k3s_install_script_sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Installed K3s version is read
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: K3s is installed in the pinned version
+  ansible.builtin.command: /usr/local/bin/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: k3s_version not in k3s_installed.stdout
+  changed_when: true
+
+- name: K3s is running and starts at boot
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Admin kubeconfig is copied to the workstation
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ k3s_local_kubeconfig }}"
+    flat: true
+
+- name: Local kubeconfig is readable only by its owner
+  ansible.builtin.file:
+    path: "{{ k3s_local_kubeconfig }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

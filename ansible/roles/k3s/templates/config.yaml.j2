@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# K3s reads this file at start. Keys are the server flags without the leading "--".
+
+# Admin kubeconfig (/etc/rancher/k3s/k3s.yaml) readable by root only.
+write-kubeconfig-mode: "0600"
+
+# Nothing is published from this cluster: no Ingress controller, no LoadBalancer.
+# Access goes through an SSH tunnel and kubectl port-forward.
+disable:
+  - traefik
+  - servicelb
+
+# Encrypt Secrets at rest in the datastore. Easiest to enable before the first start.
+secrets-encryption: true

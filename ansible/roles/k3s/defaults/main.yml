@@ -1,0 +1,12 @@
+# Pinned K3s release. Keep it within one minor version of kubectl on the workstation.
+# Current stable: curl -sL -o /dev/null -w '%{url_effective}\n' https://update.k3s.io/v1-release/channels/stable
+k3s_version: "v1.37.2+k3s1"
+
+# Install script from the same release tag (not the moving https://get.k3s.io),
+# checked against this SHA-256 before it runs. Update it together with k3s_version.
+k3s_install_script_url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version }}/install.sh"
+k3s_install_script_sha256: "ed01f89fd977bf20ac1516bbebf8370bf3ddbaa55dac8aba610956a4c78cc00b"
+
+# Where the admin kubeconfig lands on the workstation: outside the repo, because it
+# holds cluster admin credentials. Same path as KUBECONFIG in .env.
+k3s_local_kubeconfig: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/socialagent-lab.yaml"
