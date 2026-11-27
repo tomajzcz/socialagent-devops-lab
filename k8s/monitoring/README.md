@@ -73,10 +73,17 @@ the chart.
 ## Access
 
 ```bash
-kubectl -n monitoring port-forward svc/monitoring-kube-prometheus-prometheus 9090   # http://localhost:9090
-kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80                   # http://localhost:3000
-security find-generic-password -a "$USER" -s socialagent-lab-grafana -w | pbcopy    # password for user admin
+scripts/lab-tunnel.sh up                                                          # in the background
+security find-generic-password -a "$USER" -s socialagent-lab-grafana -w | pbcopy  # password for user admin
+scripts/lab-tunnel.sh down                                                        # when done
 ```
+
+Prometheus is then on http://localhost:9090, Grafana on http://localhost:3000
+and Alertmanager on http://localhost:9093. The script forwards them to their
+ClusterIPs through the same SSH connection as the Kubernetes API, so pod
+restarts do not break it. Without the script,
+`kubectl -n monitoring port-forward svc/<service> <port>` does the same, one
+terminal per service.
 
 Healthy state: 14 targets UP (13 from the chart, 1 for the exporter). The
 `Watchdog` alert always fires by design: it is a dead man's switch that proves
@@ -88,7 +95,7 @@ Check the route to Slack without waiting for a real problem: send an alert by
 hand. It arrives within 30 seconds and resolves by itself after 5 minutes.
 
 ```bash
-kubectl -n monitoring port-forward svc/monitoring-kube-prometheus-alertmanager 9093   # http://localhost:9093
+scripts/lab-tunnel.sh up   # Alertmanager on http://localhost:9093
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:9093/api/v2/alerts \
   -H 'Content-Type: application/json' -d '[{
     "labels": {"alertname": "LabTestAlert", "severity": "warning", "namespace": "socialagent"},

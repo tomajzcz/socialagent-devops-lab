@@ -67,6 +67,9 @@ ssh -N -L 6443:127.0.0.1:6443 tomajz@"$LAB_SERVER_IP"   # terminal 1, keep it op
 kubectl get nodes                                        # terminal 2, KUBECONFIG comes from ../.env
 ```
 
+Once the monitoring stack is installed, `../scripts/lab-tunnel.sh up` opens
+this tunnel together with the monitoring UIs in the background.
+
 ## Notes
 
 - **Bootstrap on a fresh server.** The first run has to connect as `root`

@@ -48,7 +48,7 @@ The whole stack uses about 2 GiB of the node's memory.
 | `k8s/exporter/` | Deployment, Service, ServiceMonitor, alert rules and the Grafana dashboard as code. The namespace enforces the `restricted` Pod Security Standard. |
 | `k8s/monitoring/` | kube-prometheus-stack values: K3s-specific settings, storage and retention, routing to Slack. |
 | `k8s/drill/` | A fake health endpoint inside the cluster, for testing the alerts end to end. |
-| `scripts/` | `check-alerting.sh`: unit tests of the alert rules and of the Alertmanager routing. |
+| `scripts/` | `check-alerting.sh`: unit tests of the alert rules and of the Alertmanager routing. `lab-tunnel.sh`: one background SSH connection to the API and the monitoring UIs. |
 | `.github/workflows/` | CI that validates everything on every push and pull request. It never deploys. |
 
 The READMEs in `ansible/`, `exporter/`, `k8s/monitoring/` and `k8s/drill/`
@@ -58,7 +58,8 @@ have the details and the reasons behind them.
 
 - **Nothing is published.** The Hetzner firewall lets in only SSH and ping,
   from one address. The Kubernetes API, Prometheus, Grafana and Alertmanager
-  are reached through an SSH tunnel and `kubectl port-forward`.
+  are reached through an SSH tunnel that listens only on the workstation's
+  localhost.
 - **No secrets in Git.** The Hetzner token, the Grafana password and the Slack
   webhook live in the macOS Keychain. The cluster gets them as Secrets created
   from stdin, and K3s encrypts Secrets at rest.
@@ -98,6 +99,10 @@ On a fresh setup, run from the repository root after
 4. **Monitoring:** namespace, Secrets and the Helm chart, see
    `k8s/monitoring/README.md`.
 5. **Exporter:** `kubectl apply -k k8s/exporter`.
+
+Day to day, `scripts/lab-tunnel.sh up` opens one SSH connection in the
+background that carries the Kubernetes API (6443), Prometheus (9090), Grafana
+(3000) and Alertmanager (9093); `status` checks them and `down` closes it.
 
 ## Checks
 
