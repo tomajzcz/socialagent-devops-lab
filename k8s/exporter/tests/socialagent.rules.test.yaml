@@ -1,0 +1,117 @@
+# Unit tests for the alerts in ../prometheusrule.yaml, run by scripts/check-alerting.sh.
+# The script writes the rule groups to socialagent.rules.yaml next to a copy of this file.
+rule_files:
+  - socialagent.rules.yaml
+evaluation_interval: 30s
+tests:
+  # Healthy: no alert at all.
+  - interval: 30s
+    input_series:
+      - series: 'socialagent_health_status{namespace="socialagent",status="ok"}'
+        values: '1x40'
+      - series: 'socialagent_health_status{namespace="socialagent",status="down"}'
+        values: '0x40'
+      - series: 'socialagent_health_last_probe_timestamp_seconds{namespace="socialagent"}'
+        values: '0+30x40'
+      - series: 'up{job="socialagent-exporter",namespace="socialagent"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: SocialAgentDown
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SocialAgentProbeStale
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SocialAgentExporterDown
+        exp_alerts: []
+  # Down from 1m: pending at 2m30s, firing at 3m.
+  - interval: 30s
+    input_series:
+      - series: 'socialagent_health_status{namespace="socialagent",status="down"}'
+        values: '0 0 1x20'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: SocialAgentDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: SocialAgentDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: socialagent
+            exp_annotations:
+              summary: SocialAgent cannot reach its database
+              description: /api/health has answered 503 "down" for 2 minutes. The app runs, but its database check fails. Check Supabase and the app logs.
+  # Unknown from 0: firing at 3m.
+  - interval: 30s
+    input_series:
+      - series: 'socialagent_health_status{namespace="socialagent",status="unknown"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: SocialAgentUnreachable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: SocialAgentUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: socialagent
+            exp_annotations:
+              summary: SocialAgent does not answer
+              description: The exporter has got no valid answer from /api/health for 3 minutes (timeout, connection error or unexpected body). Open the site in a browser, then check the exporter logs.
+  # Degraded from 0: firing at 15m.
+  - interval: 30s
+    input_series:
+      - series: 'socialagent_health_status{namespace="socialagent",status="degraded"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 14m30s
+        alertname: SocialAgentDegraded
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: SocialAgentDegraded
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: socialagent
+            exp_annotations:
+              summary: SocialAgent cron jobs have problems
+              description: /api/health has reported "degraded" for 15 minutes. Cron jobs are stale or failing, or the cron check itself failed. Details are in the admin e-mail from /api/cron/cron-health.
+  # Last probe stuck at 0: above 180 s from 3m30s, firing at 5m30s.
+  - interval: 30s
+    input_series:
+      - series: 'socialagent_health_last_probe_timestamp_seconds{namespace="socialagent"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: SocialAgentProbeStale
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: SocialAgentProbeStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: socialagent
+            exp_annotations:
+              summary: The exporter has stopped probing SocialAgent
+              description: The last probe finished 6m 0s ago, but the exporter probes every minute. Its probe loop is stuck, restart the exporter pod.
+  # Scrape fails from 1m: firing at 6m.
+  - interval: 30s
+    input_series:
+      - series: 'up{job="socialagent-exporter",namespace="socialagent"}'
+        values: '1 1 0x20'
+    alert_rule_test:
+      - eval_time: 5m30s
+        alertname: SocialAgentExporterDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: SocialAgentExporterDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: socialagent
+            exp_annotations:
+              summary: Prometheus cannot scrape the SocialAgent exporter
+              description: No successful scrape for 5 minutes, so the other SocialAgent alerts cannot fire. Check kubectl -n socialagent get pods.

@@ -1,0 +1,114 @@
+# Validation only: nothing here deploys, connects to the lab server or uses
+# secrets. Every check can also be run on the workstation, see README.md.
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The token can only read the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the run that is still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to a commit SHA (a tag can be moved), the version is in the comment.
+jobs:
+  terraform:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.2
+      - run: terraform fmt -check -recursive -diff
+      # No backend and no token: validate only needs the provider schema.
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  ansible:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ansible
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      # Same versions as on the workstation.
+      - run: pip install ansible-core==2.22.0 ansible-lint==26.11.0
+      # Installs the collections from requirements.yml, then lints with the production profile.
+      - run: ansible-lint
+
+  kubernetes:
+    runs-on: ubuntu-24.04
+    env:
+      KUBECONFORM_VERSION: v0.8.0
+      KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+      # JSON schemas for CRDs such as ServiceMonitor, from a fixed commit of the catalog.
+      CRD_SCHEMAS: https://raw.githubusercontent.com/datreeio/CRDs-catalog/b50f3fbc45169a14b6d2d3f767b32fd96ef4a3fa/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
+      - name: Install kubeconform (checksum verified)
+        run: |
+          curl -sSLo "$RUNNER_TEMP/kubeconform.tar.gz" \
+            "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/kubeconform-linux-amd64.tar.gz"
+          echo "$KUBECONFORM_SHA256  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum --check -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP/bin" kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Exporter manifests
+        run: |
+          kubectl kustomize k8s/exporter \
+            | kubeconform -strict -summary -kubernetes-version 1.37.2 \
+                -schema-location default -schema-location "$CRD_SCHEMAS" -
+      - name: Monitoring namespace and drill
+        run: |
+          kubeconform -strict -summary -kubernetes-version 1.37.2 \
+            k8s/monitoring/namespace.yaml k8s/drill/health-mock.yaml
+      - name: kube-prometheus-stack rendered with our values
+        run: |
+          helm template monitoring kube-prometheus-stack \
+            --repo https://prometheus-community.github.io/helm-charts --version 94.1.0 \
+            --namespace monitoring --values k8s/monitoring/values.yaml \
+            | kubeconform -strict -summary -kubernetes-version 1.37.2 \
+                -schema-location default -schema-location "$CRD_SCHEMAS" -
+
+  alerting:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.2
+      # promtool unit tests of the alert rules, amtool checks of the Alertmanager routing.
+      - run: ./scripts/check-alerting.sh
+
+  exporter:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Proves the Dockerfile and the pinned requirements still build. Nothing is pushed:
+      # releases stay a manual, tagged step.
+      - run: docker build --tag socialagent-exporter:ci exporter
