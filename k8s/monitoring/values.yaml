@@ -1,0 +1,60 @@
+# kube-prometheus-stack values for the single-node K3s lab.
+# The chart version is pinned in the install command, see README.md.
+
+# K3s runs the scheduler, controller-manager and kube-proxy inside the k3s
+# process with metrics bound to localhost, and stores cluster state in SQLite
+# instead of etcd. Their targets would stay DOWN and fire alerts, so they are
+# off. Turning a component off also drops its default alert rules.
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    # local-path volumes do not enforce their size, this is the real limit.
+    retentionSize: 8GB
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
+    # Keep data across pod restarts, on the node disk (K3s local-path provisioner).
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+grafana:
+  # Admin credentials come from a Secret created outside Git, see README.md.
+  admin:
+    existingSecret: grafana-admin
+  # Stateless on purpose: datasources and dashboards are provisioned from code.
+  persistence:
+    enabled: false
+  defaultDashboardsTimezone: browser
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

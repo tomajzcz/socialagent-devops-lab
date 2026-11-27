@@ -68,14 +68,31 @@ secret.
 
 ## Deploy
 
-Needs the SSH tunnel to the Kubernetes API (see `../ansible/README.md`).
+Needs the SSH tunnel to the Kubernetes API (see `../ansible/README.md`) and the
+monitoring stack from `../k8s/monitoring`, which provides the ServiceMonitor CRD.
 
 ```bash
-kubectl kustomize ../k8s/exporter | kubeconform -strict -summary -kubernetes-version 1.37.2
+kubectl kustomize ../k8s/exporter | kubeconform -strict -summary -kubernetes-version 1.37.2 -skip ServiceMonitor -
+kubectl apply -k ../k8s/exporter --dry-run=server
 kubectl apply -k ../k8s/exporter
 kubectl -n socialagent port-forward svc/socialagent-exporter 8000:8000
 ```
 
+kubeconform has no schema for the ServiceMonitor CRD, so it skips it offline;
+the server-side dry run checks it against the CRD in the cluster.
+
 A new version means: push a new tag, put its tag and digest into
 `../k8s/exporter/deployment.yaml`, apply. The `socialagent` namespace enforces
 the `restricted` Pod Security Standard.
+
+## Monitoring
+
+- `../k8s/exporter/servicemonitor.yaml` tells Prometheus to scrape the `http`
+  port (every 30 s, the Prometheus default). Scrapes only read the last result,
+  they never trigger a probe. The `release: monitoring` label is required;
+  without it Prometheus ignores the ServiceMonitor without any error.
+- `../k8s/exporter/dashboards/socialagent-health.json` is the Grafana dashboard
+  "SocialAgent / Health". kustomize wraps it in a ConfigMap labelled
+  `grafana_dashboard: "1"`, and the Grafana sidecar loads it from there.
+  Grafana cannot save a provisioned dashboard: change this file and apply.
+  A change made in the Grafana UI has to be copied back here as classic JSON.

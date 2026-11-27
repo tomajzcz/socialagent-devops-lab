@@ -1,0 +1,286 @@
+{
+  "uid": "socialagent-health",
+  "title": "SocialAgent / Health",
+  "description": "Health of SocialAgent as seen by the lab exporter (GET /api/health once a minute).",
+  "tags": ["socialagent"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 41,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Status",
+      "description": "Status reported by /api/health in the last probe. unknown means no valid answer: timeout, connection error or an unexpected body.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(socialagent_health_status{status=\"degraded\"})\n+ 2 * max(socialagent_health_status{status=\"down\"})\n+ 3 * max(socialagent_health_status{status=\"unknown\"})",
+          "instant": true,
+          "range": false,
+          "legendFormat": "status"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "ok", "color": "green", "index": 0 },
+                "1": { "text": "degraded", "color": "orange", "index": 1 },
+                "2": { "text": "down", "color": "red", "index": 2 },
+                "3": { "text": "unknown", "color": "purple", "index": 3 }
+              }
+            }
+          ],
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "HTTP status code",
+      "description": "HTTP status code of the last probe. /api/health returns 200 for ok and degraded, 503 for down.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(socialagent_health_http_status_code)",
+          "instant": true,
+          "range": false,
+          "legendFormat": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "0": { "text": "no response", "index": 0 } }
+            }
+          ],
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 200 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Cron problems",
+      "description": "cronProblems from the last health document. n/a when the probe got no valid answer.",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(socialagent_health_cron_problems)",
+          "instant": true,
+          "range": false,
+          "legendFormat": "cron problems"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "special",
+              "options": { "match": "nan", "result": { "text": "n/a", "color": "text", "index": 0 } }
+            }
+          ],
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Since last probe",
+      "description": "The exporter probes once a minute. Above 150 s at least two probes were missed: the exporter is stuck or not running.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "time() - max(socialagent_health_last_probe_timestamp_seconds)",
+          "instant": true,
+          "range": false,
+          "legendFormat": "age"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 150 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "state-timeline",
+      "title": "Status history",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(socialagent_health_status{status=\"degraded\"})\n+ 2 * max(socialagent_health_status{status=\"down\"})\n+ 3 * max(socialagent_health_status{status=\"unknown\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "status"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "ok", "color": "green", "index": 0 },
+                "1": { "text": "degraded", "color": "orange", "index": 1 },
+                "2": { "text": "down", "color": "red", "index": 2 },
+                "3": { "text": "unknown", "color": "purple", "index": 3 }
+              }
+            }
+          ],
+          "color": { "mode": "fixed", "fixedColor": "text" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Probe duration",
+      "description": "How long GET /api/health took, measured by the exporter.",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(socialagent_health_probe_duration_seconds)",
+          "legendFormat": "probe duration"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Exporter memory",
+      "description": "Working set of the exporter container against its memory limit. Reaching the limit means an OOM kill.",
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(container_memory_working_set_bytes{namespace=\"socialagent\", container=\"exporter\"})",
+          "legendFormat": "working set"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(kube_pod_container_resource_limits{namespace=\"socialagent\", container=\"exporter\", resource=\"memory\"})",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    }
+  ]
+}

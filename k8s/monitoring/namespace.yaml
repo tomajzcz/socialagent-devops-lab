@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    # node-exporter reads node metrics through the host network, PID namespace
+    # and filesystem, which no stricter Pod Security level allows. That is why
+    # the exporter runs in its own restricted namespace.
+    pod-security.kubernetes.io/enforce: privileged

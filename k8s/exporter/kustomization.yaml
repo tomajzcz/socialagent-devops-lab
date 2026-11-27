@@ -4,3 +4,18 @@ resources:
   - namespace.yaml
   - deployment.yaml
   - service.yaml
+  - servicemonitor.yaml
+
+# The Grafana dashboard stays a plain JSON file; kustomize wraps it in a ConfigMap.
+# The Grafana sidecar loads every ConfigMap labelled grafana_dashboard=1, in any namespace.
+configMapGenerator:
+  - name: socialagent-dashboard
+    namespace: socialagent
+    files:
+      - dashboards/socialagent-health.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      # A fixed name, so an update replaces the ConfigMap instead of adding a
+      # new hashed copy next to it (Grafana would then see two dashboards with one uid).
+      disableNameSuffixHash: true

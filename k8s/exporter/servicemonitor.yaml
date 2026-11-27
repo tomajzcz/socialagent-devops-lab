@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: socialagent-exporter
+  namespace: socialagent
+  labels:
+    app.kubernetes.io/name: socialagent-exporter
+    # Prometheus from kube-prometheus-stack only picks up ServiceMonitors with
+    # this label (the Helm release name). Without it nothing fails, the target
+    # just never appears.
+    release: monitoring
+spec:
+  # Matches labels on the Service, not on the pods.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: socialagent-exporter
+  endpoints:
+    # Port name from service.yaml, not the number.
+    - port: http
+      path: /metrics
