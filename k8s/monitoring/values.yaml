@@ -37,12 +37,42 @@ prometheus:
 
 alertmanager:
   alertmanagerSpec:
+    # Links in Slack messages point here; they work while the port-forward runs.
+    externalUrl: http://localhost:9093
+    # Secrets created outside Git, mounted at /etc/alertmanager/secrets/<name>/.
+    secrets:
+      - alertmanager-slack
     resources:
       requests:
         cpu: 10m
         memory: 32Mi
       limits:
         memory: 128Mi
+  # Merged into the chart's default config: keys given here replace the
+  # defaults, lists are replaced as a whole. The default inhibit rules and the
+  # templates path stay.
+  config:
+    route:
+      receiver: "null"
+      # One Slack message per alert type, not one for the whole namespace.
+      group_by: [namespace, alertname]
+      routes:
+        # Everything else (Watchdog, InfoInhibitor, info alerts) goes to "null".
+        - receiver: slack
+          matchers:
+            - severity =~ "warning|critical"
+    receivers:
+      - name: "null"
+      - name: slack
+        slack_configs:
+          # The webhook URL is a secret: read from the mounted Secret, never stored in Git.
+          - api_url_file: /etc/alertmanager/secrets/alertmanager-slack/webhook-url
+            send_resolved: true
+            title: '{{ if eq .Status "firing" }}:rotating_light:{{ else }}:white_check_mark:{{ end }} [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+            text: |-
+              {{ range .Alerts }}*{{ .Labels.severity }}* | {{ .Annotations.summary }}
+              {{ .Annotations.description }}
+              {{ end }}
 
 grafana:
   # Admin credentials come from a Secret created outside Git, see README.md.

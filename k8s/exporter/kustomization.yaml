@@ -5,6 +5,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - servicemonitor.yaml
+  - prometheusrule.yaml
 
 # The Grafana dashboard stays a plain JSON file; kustomize wraps it in a ConfigMap.
 # The Grafana sidecar loads every ConfigMap labelled grafana_dashboard=1, in any namespace.

@@ -1,0 +1,63 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: socialagent-health
+  namespace: socialagent
+  labels:
+    app.kubernetes.io/name: socialagent-exporter
+    # Same rule as for ServiceMonitors: Prometheus only loads rules with this label.
+    release: monitoring
+spec:
+  groups:
+    - name: socialagent-health
+      rules:
+        # The exporter probes every 60 s, so 2m means at least two failed probes
+        # in a row: one failed database check does not page anyone.
+        - alert: SocialAgentDown
+          expr: max by (namespace) (socialagent_health_status{status="down"}) == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: SocialAgent cannot reach its database
+            description: /api/health has answered 503 "down" for 2 minutes. The app runs, but its database check fails. Check Supabase and the app logs.
+        # A bit longer than Down: a network blip between the lab and the site
+        # looks the same as a dead site.
+        - alert: SocialAgentUnreachable
+          expr: max by (namespace) (socialagent_health_status{status="unknown"}) == 1
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: SocialAgent does not answer
+            description: The exporter has got no valid answer from /api/health for 3 minutes (timeout, connection error or unexpected body). Open the site in a browser, then check the exporter logs.
+        # Users are still served, so this is a warning with a long wait.
+        - alert: SocialAgentDegraded
+          expr: max by (namespace) (socialagent_health_status{status="degraded"}) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: SocialAgent cron jobs have problems
+            description: /api/health has reported "degraded" for 15 minutes. Cron jobs are stale or failing, or the cron check itself failed. Details are in the admin e-mail from /api/cron/cron-health.
+        # Normal age is up to about 90 s (60 s probe interval + 30 s scrape interval).
+        - alert: SocialAgentProbeStale
+          expr: time() - max by (namespace) (socialagent_health_last_probe_timestamp_seconds) > 180
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: The exporter has stopped probing SocialAgent
+            description: The last probe finished {{ $value | humanizeDuration }} ago, but the exporter probes every minute. Its probe loop is stuck, restart the exporter pod.
+        # Without scrapes the other alerts have no data and stay silent, so this
+        # one watches the watcher. absent() also covers a missing target, not
+        # only up == 0. Its result has no labels, so namespace is set here.
+        - alert: SocialAgentExporterDown
+          expr: absent(up{job="socialagent-exporter", namespace="socialagent"} == 1)
+          for: 5m
+          labels:
+            severity: warning
+            namespace: socialagent
+          annotations:
+            summary: Prometheus cannot scrape the SocialAgent exporter
+            description: No successful scrape for 5 minutes, so the other SocialAgent alerts cannot fire. Check kubectl -n socialagent get pods.

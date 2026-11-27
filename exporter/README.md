@@ -69,17 +69,20 @@ secret.
 ## Deploy
 
 Needs the SSH tunnel to the Kubernetes API (see `../ansible/README.md`) and the
-monitoring stack from `../k8s/monitoring`, which provides the ServiceMonitor CRD.
+monitoring stack from `../k8s/monitoring`, which provides the ServiceMonitor and
+PrometheusRule CRDs.
 
 ```bash
-kubectl kustomize ../k8s/exporter | kubeconform -strict -summary -kubernetes-version 1.37.2 -skip ServiceMonitor -
+kubectl kustomize ../k8s/exporter | kubeconform -strict -summary -kubernetes-version 1.37.2 -skip ServiceMonitor,PrometheusRule -
 kubectl apply -k ../k8s/exporter --dry-run=server
 kubectl apply -k ../k8s/exporter
 kubectl -n socialagent port-forward svc/socialagent-exporter 8000:8000
 ```
 
-kubeconform has no schema for the ServiceMonitor CRD, so it skips it offline;
-the server-side dry run checks it against the CRD in the cluster.
+kubeconform has no schemas for the ServiceMonitor and PrometheusRule CRDs, so
+it skips them offline. The server-side dry run checks them against the CRDs in
+the cluster, and the Prometheus Operator's admission webhook also checks the
+PromQL in the rules.
 
 A new version means: push a new tag, put its tag and digest into
 `../k8s/exporter/deployment.yaml`, apply. The `socialagent` namespace enforces
@@ -96,3 +99,18 @@ the `restricted` Pod Security Standard.
   `grafana_dashboard: "1"`, and the Grafana sidecar loads it from there.
   Grafana cannot save a provisioned dashboard: change this file and apply.
   A change made in the Grafana UI has to be copied back here as classic JSON.
+- `../k8s/exporter/prometheusrule.yaml` holds the alerts below. Like the
+  ServiceMonitor, it needs the `release: monitoring` label. All of them go to
+  Slack, see `../k8s/monitoring/README.md`.
+
+| Alert | Severity | Fires when |
+|---|---|---|
+| `SocialAgentDown` | critical | `/api/health` answers 503 `down` (database unreachable) for 2 minutes |
+| `SocialAgentUnreachable` | critical | no valid answer (timeout, connection error, bad body) for 3 minutes |
+| `SocialAgentDegraded` | warning | `degraded` (cron jobs stale or failing) for 15 minutes |
+| `SocialAgentProbeStale` | warning | the last probe is older than 180 s for 2 minutes: the probe loop is stuck |
+| `SocialAgentExporterDown` | warning | no successful scrape of the exporter for 5 minutes |
+
+From a real outage to a Slack message takes about 3 to 5 minutes: up to 60 s
+until the next probe, up to 30 s until the scrape, up to 30 s until the rule
+evaluation, then the `for` duration and 30 s `group_wait` in Alertmanager.
